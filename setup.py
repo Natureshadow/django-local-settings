@@ -44,6 +44,8 @@ if py_version == (3, 4):
 else:
     django_spec = 'django>=2.1,<2.2',
 
+yaml_spec = 'PyYAML>=3.12'
+
 
 setup(
     name='django-local-settings',
@@ -56,10 +58,14 @@ setup(
     packages=find_packages(),
     install_requires=install_requires,
     extras_require={
+        'yaml': [
+            yaml_spec,
+        ],
         'dev': [
             'coverage>=4',
             django_spec,
             'flake8',
+            yaml_spec,
             'tox>=2.6.0',
         ],
     },

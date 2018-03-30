@@ -5,8 +5,10 @@ from ..loader import Loader
 from ..types import LocalSetting
 
 
-LOCAL_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'local.cfg#test')
-DERIVED_LOCAL_SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'local.derived.cfg')
+TEST_DIR = os.path.dirname(__file__)
+LOCAL_SETTINGS_FILE = os.path.join(TEST_DIR, 'local.cfg#test')
+LOCAL_SETTINGS_FILE_YAML = os.path.join(TEST_DIR, 'local.yaml#test')
+DERIVED_LOCAL_SETTINGS_FILE = os.path.join(TEST_DIR, 'local.derived.cfg')
 
 
 class TestLoading(unittest.TestCase):
@@ -174,6 +176,12 @@ class TestLoading(unittest.TestCase):
         self.assertIn('d', settings.A.b)
 
         self.assertEqual(settings.LIST1, [2])
+
+
+class TestLoadingYAML(TestLoading):
+
+    def setUp(self):
+        self.loader = Loader(LOCAL_SETTINGS_FILE_YAML)
 
 
 class TestLoadTypes(unittest.TestCase):

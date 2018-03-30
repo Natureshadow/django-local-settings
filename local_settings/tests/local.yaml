@@ -1,0 +1,90 @@
+---
+DEFAULT_ITEMS: [a, b, c]
+
+
+---
+section: test
+
+DEFAULT_ITEMS.0: "0"
+
+PACKAGE: local_settings
+
+LOCAL_SETTING: local value
+
+A:
+  b:
+    c: 1
+    d: 2
+
+X:
+  y:
+    z: z
+
+LIST:
+  - a
+  - b
+
+OTHER_LIST: "{{ LIST }}"
+
+TEMPLATES:
+  - BACKEND: package.module.Class
+    OPTIONS:
+      context_processors:
+        - "{{ LIST.0 }}.b"
+        - "x.y.{{ X.y.z }}"
+
+INTERPOLATED:
+  x: "{{ INTERPOLATED.z }}"
+  y: "{{ INTERPOLATED.x }}"
+  z: value
+
+"{{ INTERPOLATED.x }}": interpolated key
+I.{{ INTERPOLATED.y }}: interpolated key
+Z:
+  - "{{ INTERPOLATED.y }}": 1
+"J.{{ PACKAGE }}.K": 1
+"J.{{ PACKAGE }}XXX.L": 2
+
+STUFF:
+  - thing
+PREPEND:
+  STUFF:
+    - a prepended thing
+APPEND:
+  STUFF:
+    - another thing
+
+BASE:
+  setting: 1
+  another_setting: 2
+
+OS:
+  PATH: os.path
+IMPORT_FROM_STRING:
+  - OS.PATH
+
+FORMAT_STRING: "{{ BASE.setting }}{format}"
+
+NUMBER: 1
+OTHER_NUMBER: "{{ NUMBER }}"
+
+LIST1: [1, 2]
+LIST2: "{{ LIST3 }}"
+LIST3: "{{ LIST1 }}"
+
+DICT:
+  "{{ A.b.c }}": "{{ A.b.c }}"
+  "{{ A.b.d }}": "[{{ LIST2 }}]"
+OTHER_DICT: "{{ DICT }}"
+
+"NESTED.{{ LIST.{{ NUMBER }} }}": "{{ A.{{ LIST.1 }}.c }}.{{ NUMBER }}"
+
+
+---
+section: "test:1"
+extends: #test
+ITEM: item
+
+
+---
+section: "test:empty"

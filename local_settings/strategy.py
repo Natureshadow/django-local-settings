@@ -3,10 +3,17 @@ import logging
 import json
 import os
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
+from collections import Mapping, OrderedDict, Sequence
 from configparser import NoSectionError, RawConfigParser
 
-from six import raise_from, text_type, with_metaclass
+from six import raise_from, string_types, text_type, with_metaclass
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
+else:
+    from yaml import BaseLoader
 
 from .exc import SettingsFileNotFoundError, SettingsFileSectionNotFoundError
 from .util import parse_file_name_and_section
@@ -201,6 +208,70 @@ class INIJSONStrategy(INIStrategy):
 
     def encode_value(self, value):
         return json.dumps(value)
+
+
+class YAMLStrategy(Strategy):
+
+    file_types = ('yaml', 'yml')
+
+    def read_section(self, file_name, section):
+        sections = OrderedDict()
+
+        with open(file_name) as fp:
+            documents = yaml.load_all(fp)
+            for items in documents:
+                name = items.pop('section', None) or 'default'
+                if name in sections:
+                    raise KeyError(
+                        'Duplicated section in {file_name}: {name}'.format_map(locals()))
+                sections[name] = items
+
+        defaults = sections.pop('default') if 'default' in sections else {}
+
+        for name, items in sections.items():
+            sections[name] = OrderedDict()
+            sections[name].update(defaults)
+            sections[name].update(items)
+
+        settings = OrderedDict()
+
+        if section in sections:
+            items = sections[section]
+            section_present = True
+        else:
+            items = defaults.copy()
+            section_present = False
+
+        for k, v in items.items():
+            if isinstance(v, string_types) and '{{' in v and '}}' in v:
+                print(self.encode_value(v))
+                items[k] = RawValue(self.encode_value(v))
+
+        return items, section_present
+
+    def write_settings(self, settings, file_name, section=None):
+        """Write settings to file."""
+
+    def decode_value(self, value):
+        value = value.strip()
+        if not value:
+            return None
+        try:
+            value = yaml.load(value)
+        except ValueError:
+            raise ValueError('Could not parse `{value}` as YAML'.format_map(locals()))
+        return value
+
+    def encode_value(self, value):
+        scalar = isinstance(value, string_types) or not isinstance(value, (Mapping, Sequence))
+        result = yaml.dump(value)
+        if scalar and result.endswith('\n...\n'):
+            # Chomp \n...\n
+            result = result[:-5]
+        else:
+            # Chomp \n
+            result = result[:-1]
+        return result
 
 
 def get_strategy_types():
