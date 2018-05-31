@@ -15,7 +15,7 @@ except ImportError:
 else:
     from yaml import BaseLoader
 
-from .exc import SettingsFileNotFoundError, SettingsFileSectionNotFoundError
+from .exc import LocalSettingsError, SettingsFileNotFoundError, SettingsFileSectionNotFoundError
 from .util import parse_file_name_and_section
 
 
@@ -214,6 +214,13 @@ class YAMLStrategy(Strategy):
 
     file_types = ('yaml', 'yml')
 
+    def __init__(self, *args, **kwargs):
+        if yaml is None:
+            raise LocalSettingsError(
+                'PyYAML is not installed; add django-local-settings[yaml] to '
+                'your project\'s requirements or install PyYAML manually')
+        super(YAMLStrategy, self).__init__(*args, **kwargs)
+
     def read_section(self, file_name, section):
         sections = OrderedDict()
 
@@ -224,6 +231,7 @@ class YAMLStrategy(Strategy):
                 if name in sections:
                     raise KeyError(
                         'Duplicated section in {file_name}: {name}'.format_map(locals()))
+                items['__section__'] = name
                 sections[name] = items
 
         defaults = sections.pop('default') if 'default' in sections else {}
@@ -244,7 +252,6 @@ class YAMLStrategy(Strategy):
 
         for k, v in items.items():
             if isinstance(v, string_types) and '{{' in v and '}}' in v:
-                print(self.encode_value(v))
                 items[k] = RawValue(self.encode_value(v))
 
         return items, section_present
