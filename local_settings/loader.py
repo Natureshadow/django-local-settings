@@ -105,7 +105,9 @@ class Loader(Base):
 
         def decode(value):
             if isinstance(value, RawValue):
+                print('DECODE:', value)
                 value = self.strategy.decode_value(value)
+                print('DECODED:', value)
             return value
 
         return self._traverse_object(obj, action=decode)
@@ -115,24 +117,14 @@ class Loader(Base):
             obj = action(obj)
         elif isinstance(obj, MutableMapping):
             for k, v in obj.items():
-                v = self._traverse_object(v, action)
-                obj[k] = v
+                obj[k] = self._traverse_object(v, action)
         elif isinstance(obj, Mapping):
-            items = []
-            for k, v in obj.items():
-                v = self._traverse_object(v, action)
-                items.append((k, v))
-            obj = obj.__class__(items)
+            obj = obj.__class__((k, self._traverse_object(v, action)) for (k, v) in obj.items())
         elif isinstance(obj, MutableSequence):
             for i, v in enumerate(obj):
-                v = self._traverse_object(v, action)
-                obj[i] = v
+                obj[i] = self._traverse_object(v, action)
         elif isinstance(obj, Sequence):
-            items = []
-            for v in obj:
-                v = self._traverse_object(v, action)
-                items.append(v)
-            obj = obj.__class__(items)
+            obj = obj.__class__(self._traverse_object(v, action) for v in obj)
         return obj
 
     def _interpolate_keys(self, obj, settings):
@@ -220,6 +212,8 @@ class Loader(Base):
         if '{{' not in value:
             return value, False
 
+        print('INJECT INTO:', value)
+
         i = 0
         stack = []
         new_value = value
@@ -250,17 +244,30 @@ class Loader(Base):
                 name = new_value[m:n]
                 name = name.strip()
 
+                print('NAME:', name)
+
                 try:
                     v = settings.get_dotted(name)
                 except KeyError:
                     raise KeyError('{name} not found in {settings}'.format(**locals()))
 
+                if isinstance(v, RawValue):
+                    try:
+                        v = self.strategy.decode_value(v)
+                    except ValueError:
+                        pass
+
+                print('FETCHED:', repr(v))
+
                 if not isinstance(v, string_types):
                     v = self.strategy.encode_value(v)
+                    print('CONVERTED:', repr(v))
 
                 before = new_value[:g]
                 after = new_value[h:]
                 new_value = ''.join((before, v, after))
+
+                print('NEW:', repr(v))
 
                 i = len(before) + len(v)
             else:
@@ -268,5 +275,7 @@ class Loader(Base):
 
         if stack:
             raise ValueError('Unclosed {{ ... }} in %s' % value)
+
+        print()
 
         return new_value, new_value != value

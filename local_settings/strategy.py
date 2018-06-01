@@ -1,6 +1,6 @@
 """Strategies for reading from & writing to config files."""
-import logging
 import json
+import logging
 import os
 from abc import ABCMeta, abstractmethod
 from collections import Mapping, OrderedDict, Sequence
@@ -9,13 +9,12 @@ from configparser import NoSectionError, RawConfigParser
 from six import raise_from, string_types, text_type, with_metaclass
 
 try:
-    import yaml
+    import ruamel.yaml as yaml
 except ImportError:
     yaml = None
-else:
-    from yaml import BaseLoader
 
 from .exc import LocalSettingsError, SettingsFileNotFoundError, SettingsFileSectionNotFoundError
+from .settings import Settings
 from .util import parse_file_name_and_section
 
 
@@ -203,7 +202,7 @@ class INIJSONStrategy(INIStrategy):
         try:
             value = json.loads(value)
         except ValueError:
-            raise ValueError('Could not parse `{value}` as JSON'.format(**locals()))
+            raise ValueError('Could not parse `{value!r}` as JSON'.format_map(locals()))
         return value
 
     def encode_value(self, value):
@@ -217,15 +216,34 @@ class YAMLStrategy(Strategy):
     def __init__(self, *args, **kwargs):
         if yaml is None:
             raise LocalSettingsError(
-                'PyYAML is not installed; add django-local-settings[yaml] to '
-                'your project\'s requirements or install PyYAML manually')
+                'YAML is not installed; add django-local-settings[yaml] to '
+                'your project\'s requirements or install ruamel.yaml with pip')
         super(YAMLStrategy, self).__init__(*args, **kwargs)
+        self.yaml = yaml.YAML()
+        self.yaml.register_class(RawValue)
+        self.yaml.register_class(Settings)
+
+    def read_file(self, file_name, section=None, finalize=True):
+        settings = super(YAMLStrategy, self).read_file(file_name, section, finalize)
+        if finalize:
+            settings = self._process(settings)
+        return settings
+
+    def _process(self, value):
+        if isinstance(value, string_types):
+            if '{{' in value and '}}' in value:
+                value = RawValue(value)
+        elif isinstance(value, Mapping):
+            value = OrderedDict((k, self._process(v)) for (k, v) in value.items())
+        elif isinstance(value, Sequence):
+            value = list(self._process(v) for v in value)
+        return value
 
     def read_section(self, file_name, section):
         sections = OrderedDict()
 
         with open(file_name) as fp:
-            documents = yaml.load_all(fp)
+            documents = self.yaml.load_all(fp)
             for items in documents:
                 name = items.pop('section', None) or 'default'
                 if name in sections:
@@ -241,8 +259,6 @@ class YAMLStrategy(Strategy):
             sections[name].update(defaults)
             sections[name].update(items)
 
-        settings = OrderedDict()
-
         if section in sections:
             items = sections[section]
             section_present = True
@@ -250,35 +266,25 @@ class YAMLStrategy(Strategy):
             items = defaults.copy()
             section_present = False
 
-        for k, v in items.items():
-            if isinstance(v, string_types) and '{{' in v and '}}' in v:
-                items[k] = RawValue(self.encode_value(v))
-
         return items, section_present
 
     def write_settings(self, settings, file_name, section=None):
         """Write settings to file."""
+        raise NotImplementedError
 
     def decode_value(self, value):
         value = value.strip()
         if not value:
             return None
         try:
-            value = yaml.load(value)
+            value = json.loads(value)
         except ValueError:
-            raise ValueError('Could not parse `{value}` as YAML'.format_map(locals()))
+            raise ValueError('Could not parse `{value!r}` as YAML'.format_map(locals()))
         return value
 
     def encode_value(self, value):
-        scalar = isinstance(value, string_types) or not isinstance(value, (Mapping, Sequence))
-        result = yaml.dump(value)
-        if scalar and result.endswith('\n...\n'):
-            # Chomp \n...\n
-            result = result[:-5]
-        else:
-            # Chomp \n
-            result = result[:-1]
-        return result
+        print('ENCODE', repr(value), '=>', repr(json.dumps(value)))
+        return json.dumps(value)
 
 
 def get_strategy_types():

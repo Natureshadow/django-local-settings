@@ -74,7 +74,7 @@ LIST3: "{{ LIST1 }}"
 
 DICT:
   "{{ A.b.c }}": "{{ A.b.c }}"
-  "{{ A.b.d }}": "[{{ LIST2 }}]"
+  "{{ A.b.d }}": ["{{ LIST2 }}"]
 OTHER_DICT: "{{ DICT }}"
 
 "NESTED.{{ LIST.{{ NUMBER }} }}": "{{ A.{{ LIST.1 }}.c }}.{{ NUMBER }}"

@@ -44,7 +44,7 @@ if py_version == (3, 4):
 else:
     django_spec = 'django>=2.1,<2.2',
 
-yaml_spec = 'PyYAML>=3.12'
+yaml_spec = 'ruamel.yaml>=0.15.37'
 
 
 setup(
